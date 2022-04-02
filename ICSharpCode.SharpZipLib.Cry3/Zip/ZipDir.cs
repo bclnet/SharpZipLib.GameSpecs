@@ -3,7 +3,7 @@
     /// <summary>
     /// ZipDirStructures
     /// </summary>
-    public unsafe static class ZipDirStructures
+    public unsafe static class ZipDir
     {
         const uint TEA_DELTA = 0x9e3779b9;
         static void btea(uint* v, int n, uint[] k)
@@ -53,15 +53,13 @@
         static void SwapByteOrder(uint* values, int count)
         {
             for (uint* w = values, e = values + count; w != e; ++w)
-            {
                 *w = (*w >> 24) + ((*w >> 8) & 0xff00) + ((*w & 0xff00) << 8) + (*w << 24);
-            }
         }
 
         static readonly uint[] Encrypt_preciousData = { 0xc968fb67, 0x8f9b4267, 0x85399e84, 0xf9b99dc4 };
         public static void TeaEncrypt(byte* data, int size)
         {
-            uint* intBuffer = (uint*)data;
+            var intBuffer = (uint*)data;
             var encryptedLen = size >> 2;
 
             SwapByteOrder(intBuffer, encryptedLen);
@@ -72,15 +70,15 @@
         static readonly uint[] Decrypt_preciousData = { 0xc968fb67, 0x8f9b4267, 0x85399e84, 0xf9b99dc4 };
         public static void TeaDecrypt(byte* data, int size)
         {
-            uint* intBuffer = (uint*)data;
-            int encryptedLen = size >> 2;
+            var intBuffer = (uint*)data;
+            var encryptedLen = size >> 2;
 
             SwapByteOrder(intBuffer, encryptedLen);
             btea(intBuffer, -encryptedLen, Decrypt_preciousData);
             SwapByteOrder(intBuffer, encryptedLen);
         }
 
-        public static void StreamCipher(byte[] buffer, int size, uint inKey)
+        public static void StreamCipher(ref byte[] buffer, int size, uint inKey = 0)
         {
             //    StreamCipherState cipher;
             //    gEnv->pSystem->GetCrypto()->GetStreamCipher()->Init(cipher, (const uint8*)&inKey, sizeof(inKey));

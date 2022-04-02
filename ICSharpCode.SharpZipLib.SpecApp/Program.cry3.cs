@@ -16,7 +16,7 @@ using System.Text;
 //const string PakPath = @"D:\Program Files (x86)\Steam\steamapps\common\Hunt Showdown\game_hunt\gamedata.pak";
 //const string AesKey = null;
 
-// comments:STREAMCIPHER_KEYTABLE|CDR_SIGNED (INDEV)
+// comments:STREAMCIPHER_KEYTABLE|CDR_SIGNED (FILE)
 const string PakPath = @"D:\Program Files (x86)\Steam\steamapps\common\SNOW\Assets\GameData.pak";
 const string AesKey = null;
 
@@ -38,12 +38,12 @@ foreach (ZipEntry ent in pak)
 {
 	Console.WriteLine(ent.Name);
 
-	// read
-	//using var input = pak.GetInputStream(ent);
-	//var s = new MemoryStream();
-	//input.CopyTo(s);
-	//s.Position = 0;
-	//Console.WriteLine(Encoding.ASCII.GetString(s.ToArray()));
+    // read
+    using var input = pak.GetInputStream(ent);
+    var s = new MemoryStream();
+    input.CopyTo(s);
+    s.Position = 0;
+    Console.WriteLine(Encoding.ASCII.GetString(s.ToArray()));
 }
 
 

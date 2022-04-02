@@ -51,7 +51,7 @@ namespace ICSharpCode.SharpZipLib.Zip
 
 		#endregion
 
-		#region Constructors
+		internal long OffsetAfterNameLen;
 
 		/// <summary>
 		/// Creates a zip entry with the given name.
@@ -113,17 +113,5 @@ namespace ICSharpCode.SharpZipLib.Zip
 
 			IsUnicodeText = unicode;
 		}
-
-		/// <summary>
-		/// Creates a deep copy of the given zip entry.
-		/// </summary>
-		/// <param name="entry">
-		/// The entry to copy.
-		/// </param>
-		[Obsolete("Use Clone instead")]
-		public Cry3Entry(ZipEntry entry)
-			: base(entry) { }
-
-		#endregion Constructors
 	}
 }

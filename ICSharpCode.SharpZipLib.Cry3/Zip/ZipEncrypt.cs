@@ -19,72 +19,38 @@ namespace ICSharpCode.SharpZipLib.Zip
     /// </summary>
     public unsafe static class ZipEncrypt
     {
-        static bool StartStreamCipher(byte[] key, byte[] iv, out IBufferedCipher cipher, uint offset = 0)
+        static bool StartStreamCipher(byte[] key, byte[] iv, out IBufferedCipher cipher)
         {
             try
             {
-                cipher = CipherUtilities.GetCipher("Twofish/CBC/NoPadding");
-                //var cipher = new BufferedBlockCipher(new TwofishEngine());
-                //cipher = (IBufferedCipher)new CbcBlockCipher(new TwofishEngine());
+                cipher = new BufferedBlockCipher(new SicRevBlockCipher(new TwofishEngine()));
                 cipher.Init(false, new ParametersWithIV(new KeyParameter(key), iv));
             }
             catch (CryptoException ex) { Console.WriteLine(ex.Message); cipher = default; return false; }
-
-            // Seek forward into the stream cipher by offset bytes
-            var blockSize = cipher.GetBlockSize();
-            var offsetBlocks = offset / blockSize;
-            var offsetRemaining = offset - (offsetBlocks * blockSize);
-
-            if (offsetBlocks > 0)
-            {
-                throw new NotImplementedException();
-                //    SwapEndian((uint32*)(&pCTR->ctr[0]), 4);
-                //    *((uint32*)(&pCTR->ctr[0])) += offset_blocks;
-                //    SwapEndian((uint32*)(&pCTR->ctr[0]), 4);
-                //    ctr_setiv(pCTR->ctr, pCTR->ctrlen, pCTR);
-            }
-
-            // Seek into the last block to initialize the padding
-            if (offsetRemaining > 0)
-            {
-                var buffer = new byte[1024];
-                var bytesConsumed = 0;
-                while (bytesConsumed < offsetRemaining)
-                {
-                    var bytesToConsume = (int)Math.Min(1024, offsetRemaining - bytesConsumed);
-                    cipher.ProcessBytes(buffer, 0, bytesToConsume, buffer, 0);
-                    bytesConsumed += bytesToConsume;
-                }
-            }
-
             return true;
         }
 
-        static void FinishStreamCipher(IBufferedCipher cipher)
-            => cipher.DoFinal();
-
-        static bool DecryptBufferWithStreamCipher(byte[] data, int size, IBufferedCipher cipher)
+        static bool DecryptBufferWithStreamCipher(ref byte[] data, int size, IBufferedCipher cipher)
         {
             try
             {
-                cipher.ProcessBytes(data, 0, size, data, 0);
+                data = cipher.DoFinal(data, 0, size);
                 return true;
             }
             catch (CryptoException ex) { Console.WriteLine(ex.Message); return false; }
         }
 
-        public static bool DecryptBufferWithStreamCipher(byte[] data, int size, byte[] key, byte[] iv)
+        public static bool DecryptBufferWithStreamCipher(ref byte[] data, int size, byte[] key, byte[] iv)
         {
             if (!StartStreamCipher(key, iv, out var cipher)) return false;
-            if (!DecryptBufferWithStreamCipher(data, size, cipher)) return false;
-            //cipher.DoFinal(data, 0);
+            if (!DecryptBufferWithStreamCipher(ref data, size, cipher)) return false;
             return true;
         }
 
-        static int GetEncryptionKeyIndex(ZipEntry fileEntry)
+        public static int GetEncryptionKeyIndex(ZipEntry fileEntry)
             => (int)~(fileEntry.Crc >> 2) & 0xF;
 
-        static void GetEncryptionInitialVector(ZipEntry fileEntry, out byte[] iv)
+        public static void GetEncryptionInitialVector(ZipEntry fileEntry, out byte[] iv)
         {
             var intIV = new[] {
                 (uint)unchecked(fileEntry.Size ^ (fileEntry.CompressedSize << 12)),
@@ -179,14 +145,5 @@ namespace ICSharpCode.SharpZipLib.Zip
         }
 
         #endregion
-
-        //public static Stream GetCipherReadStream(Stream stream, string algorithm, byte[] key, byte[] iv)
-        //{
-        //    var readCipher = CipherUtilities.GetCipher(algorithm); //"AES/CFB8/NoPadding"
-        //    if (iv == null) iv = new byte[readCipher.GetBlockSize()];
-        //    readCipher.Init(false, new ParametersWithIV(new KeyParameter(key), iv));
-        //    return new CipherStream(stream, readCipher, null);
-        //}
     }
 }
-;

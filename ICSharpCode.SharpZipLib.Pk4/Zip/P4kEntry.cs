@@ -53,8 +53,6 @@ namespace ICSharpCode.SharpZipLib.Zip
 
 		#endregion
 
-		#region Constructors
-
 		/// <summary>
 		/// Creates a zip entry with the given name.
 		/// </summary>
@@ -115,18 +113,6 @@ namespace ICSharpCode.SharpZipLib.Zip
 
 			IsUnicodeText = unicode;
 		}
-
-		/// <summary>
-		/// Creates a deep copy of the given zip entry.
-		/// </summary>
-		/// <param name="entry">
-		/// The entry to copy.
-		/// </param>
-		[Obsolete("Use Clone instead")]
-		public P4kEntry(ZipEntry entry)
-			: base(entry) { }
-
-		#endregion Constructors
 
 		/// <summary>
 		/// Determines whether [is aes crypted].
