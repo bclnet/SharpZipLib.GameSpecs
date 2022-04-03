@@ -3,8 +3,9 @@
     /// <summary>
     /// ZipDirStructures
     /// </summary>
-    public unsafe static class ZipDir
+    internal unsafe static class ZipDir
     {
+        static readonly uint[] TEA_DEFAULTKEY = { 0xc968fb67, 0x8f9b4267, 0x85399e84, 0xf9b99dc4 };
         const uint TEA_DELTA = 0x9e3779b9;
         static void btea(uint* v, int n, uint[] k)
         {
@@ -56,29 +57,33 @@
                 *w = (*w >> 24) + ((*w >> 8) & 0xff00) + ((*w & 0xff00) << 8) + (*w << 24);
         }
 
-        static readonly uint[] Encrypt_preciousData = { 0xc968fb67, 0x8f9b4267, 0x85399e84, 0xf9b99dc4 };
-        public static void TeaEncrypt(byte* data, int size)
+        internal static void TeaEncrypt(ref byte[] data, int size)
         {
-            var intBuffer = (uint*)data;
-            var encryptedLen = size >> 2;
+            fixed (byte* dataPtr = data)
+            {
+                var intBuffer = (uint*)dataPtr;
+                var encryptedLen = size >> 2;
 
-            SwapByteOrder(intBuffer, encryptedLen);
-            btea(intBuffer, encryptedLen, Encrypt_preciousData);
-            SwapByteOrder(intBuffer, encryptedLen);
+                SwapByteOrder(intBuffer, encryptedLen);
+                btea(intBuffer, encryptedLen, TEA_DEFAULTKEY);
+                SwapByteOrder(intBuffer, encryptedLen);
+            }
         }
 
-        static readonly uint[] Decrypt_preciousData = { 0xc968fb67, 0x8f9b4267, 0x85399e84, 0xf9b99dc4 };
-        public static void TeaDecrypt(byte* data, int size)
+        internal static void TeaDecrypt(ref byte[] data, int size, Cry3File.CryCustomTeaEncryptionHeader header)
         {
-            var intBuffer = (uint*)data;
-            var encryptedLen = size >> 2;
+            fixed (byte* dataPtr = data)
+            {
+                var intBuffer = (uint*)dataPtr;
+                var encryptedLen = size >> 2;
 
-            SwapByteOrder(intBuffer, encryptedLen);
-            btea(intBuffer, -encryptedLen, Decrypt_preciousData);
-            SwapByteOrder(intBuffer, encryptedLen);
+                SwapByteOrder(intBuffer, encryptedLen);
+                btea(intBuffer, -encryptedLen, TEA_DEFAULTKEY);
+                SwapByteOrder(intBuffer, encryptedLen);
+            }
         }
 
-        public static void StreamCipher(ref byte[] buffer, int size, uint inKey = 0)
+        internal static void StreamCipher(ref byte[] data, int size, uint inKey = 0)
         {
             //    StreamCipherState cipher;
             //    gEnv->pSystem->GetCrypto()->GetStreamCipher()->Init(cipher, (const uint8*)&inKey, sizeof(inKey));

@@ -129,20 +129,13 @@ namespace ICSharpCode.SharpZipLib.Zip
             __stringCodec = _stringCodec;
             isStreamOwner = true;
 
-            if (stringCodec != null)
-            {
-                __stringCodec = _stringCodec = stringCodec;
-            }
+            if (stringCodec != null) __stringCodec = _stringCodec = stringCodec;
 
             try
             {
                 ReadEntries();
             }
-            catch
-            {
-                DisposeInternal(true);
-                throw;
-            }
+            catch { DisposeInternal(true); throw; }
         }
 
         /// <summary>
@@ -175,16 +168,10 @@ namespace ICSharpCode.SharpZipLib.Zip
             : base(EmptyStreamHack, false)
         {
             isNewArchive_ = false;
-            if (file == null)
-            {
-                throw new ArgumentNullException(nameof(file));
-            }
+            if (file == null) throw new ArgumentNullException(nameof(file));
             _aesKey = aesKey;
 
-            if (!file.CanSeek)
-            {
-                throw new ArgumentException("Stream is not seekable", nameof(file));
-            }
+            if (!file.CanSeek) throw new ArgumentException("Stream is not seekable", nameof(file));
 
             EntryFactory = new Cry3EntryFactory();
             _baseStream = _stream = baseStream_ = file;
@@ -196,11 +183,7 @@ namespace ICSharpCode.SharpZipLib.Zip
             {
                 ReadEntries();
             }
-            catch
-            {
-                DisposeInternal(true);
-                throw;
-            }
+            catch { DisposeInternal(true); throw; }
         }
 
         /// <summary>
@@ -243,16 +226,10 @@ namespace ICSharpCode.SharpZipLib.Zip
             : base(EmptyStreamHack, false)
         {
             isNewArchive_ = false;
-            if (stream == null)
-            {
-                throw new ArgumentNullException(nameof(stream));
-            }
+            if (stream == null) throw new ArgumentNullException(nameof(stream));
             _aesKey = aesKey;
 
-            if (!stream.CanSeek)
-            {
-                throw new ArgumentException("Stream is not seekable", nameof(stream));
-            }
+            if (!stream.CanSeek) throw new ArgumentException("Stream is not seekable", nameof(stream));
 
             EntryFactory = new Cry3EntryFactory();
             _baseStream = _stream = baseStream_ = stream;
@@ -260,17 +237,11 @@ namespace ICSharpCode.SharpZipLib.Zip
             isStreamOwner = !leaveOpen;
 
             if (_baseStream.Length > 0)
-            {
                 try
                 {
                     ReadEntries();
                 }
-                catch
-                {
-                    DisposeInternal(true);
-                    throw;
-                }
-            }
+                catch { DisposeInternal(true); throw; }
             else
             {
                 _entries = entries_ = Array.Empty<ZipEntry>();
@@ -384,7 +355,7 @@ namespace ICSharpCode.SharpZipLib.Zip
             var method = entry.CompressionMethod;
 
             Stream result;
-            if (((int)method < METHOD_DEFLATE_AND_ENCRYPT || (int)method > METHOD_DEFLATE_AND_STREAMCIPHER_KEYTABLE))
+            if ((int)method < METHOD_DEFLATE_AND_ENCRYPT || (int)method > METHOD_DEFLATE_AND_STREAMCIPHER_KEYTABLE)
             {
                 _stream = _baseStream;
                 result = new PartialInputStream(this, start, entry.CompressedSize);
@@ -400,14 +371,13 @@ namespace ICSharpCode.SharpZipLib.Zip
                         method = CompressionMethod.Stored;
                         break;
                     case METHOD_DEFLATE_AND_ENCRYPT:
-                        fixed (byte* _ = compressed) ZipDir.TeaDecrypt(_, (int)entry.CompressedSize);
+                        ZipDir.TeaDecrypt(ref compressed, (int)entry.CompressedSize, _headerTeaEncryption);
                         method = CompressionMethod.Deflated;
                         break;
                     case METHOD_DEFLATE_AND_STREAMCIPHER:
                     case METHOD_DEFLATE_AND_STREAMCIPHER_KEYTABLE:
                         var keyIndex = ZipEncrypt.GetEncryptionKeyIndex(entry);
                         ZipEncrypt.GetEncryptionInitialVector(entry, out var IV);
-                        // Decryption failed - Don't give a clue about the encryption support
                         if (!ZipEncrypt.DecryptBufferWithStreamCipher(ref compressed, (int)entry.CompressedSize, CryCustomKeys[keyIndex], IV)) throw new ZipException("Data is corrupt");
                         method = CompressionMethod.Deflated;
                         break;
@@ -471,12 +441,7 @@ namespace ICSharpCode.SharpZipLib.Zip
 
                 while (testing && (entryIndex < Count))
                 {
-                    if (resultHandler != null)
-                    {
-                        status.SetEntry(this[entryIndex]);
-                        status.SetOperation(TestOperation.EntryHeader);
-                        resultHandler(status, null);
-                    }
+                    if (resultHandler != null) { status.SetEntry(this[entryIndex]); status.SetOperation(TestOperation.EntryHeader); resultHandler(status, null); }
 
                     try
                     {
@@ -771,8 +736,8 @@ namespace ICSharpCode.SharpZipLib.Zip
             HEADERS_NOT_ENCRYPTED = 0,                  // (None)
             HEADERS_ENCRYPTED_STREAMCIPHER = 1,         // (StreamCipher)
             HEADERS_ENCRYPTED_TEA = 2,                  // (XXTEA) TEA = Tiny Encryption Algorithm
-            HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE = 3,// (Twofish) Timur's technique. Encrypt each file and the CDR with one of 16 stream cipher keys. Encrypt the table of keys with an RSA key.
-            HEADERS_ENCRYPTED_NEWHUNT = 4,              // (Hunt) Hunt encryption
+            HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE = 3, // (Twofish) Timur's technique. Encrypt each file and the CDR with one of 16 stream cipher keys. Encrypt the table of keys with an RSA key.
+            HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE2 = 4, // (Hunt) Hunt encryption
         }
 
         // Signature settings for zip header
@@ -780,53 +745,55 @@ namespace ICSharpCode.SharpZipLib.Zip
         {
             HEADERS_NOT_SIGNED = 0,
             HEADERS_CDR_SIGNED = 1, // Includes an RSA signature based on the hash of the archive's CDR. Verified in a console compatible way.
-            HEADERS_NEWHUNT = 2,    //
+            HEADERS_CDR_SIGNED2 = 2, //
         }
 
         EHeaderEncryptionType _encryptedHeaders;
         EHeaderSignatureType _signedHeaders;
 
-        // Header for HEADERS_ENCRYPTED_CRYCUSTOM technique. Paired with a CrySignedCDRHeader to allow for signing as well as encryption.
-        // i.e. the comment section for a file that uses this technique needs the following in order:
-        // CryCustomExtendedHeader, CrySignedCDRHeader, CryCustomEncryptionHeader
-        internal unsafe struct CryCustomEncryptionHeader
+        // Stores type of encryption and signing
+        struct CryCustomExtendedHeader
         {
-            public const int SizeOf = 4 + RSA_KEY_MESSAGE_LENGTH + BLOCK_CIPHER_NUM_KEYS * RSA_KEY_MESSAGE_LENGTH;
-            public const int CDR_IV_SizeOf = RSA_KEY_MESSAGE_LENGTH;
-            //public const int keys_table_SizeOf = BLOCK_CIPHER_NUM_KEYS * RSA_KEY_MESSAGE_LENGTH;
+            public const ushort SizeOf = 8;
             public uint nHeaderSize;                    // Size of the extended header.
-            public byte[] CDR_IV/*[RSA_KEY_MESSAGE_LENGTH]*/; // Initial Vector is actually BLOCK_CIPHER_KEY_LENGTH bytes in length, but is encrypted as a RSA_KEY_MESSAGE_LENGTH byte message.
-            public byte[] keys_table/*[BLOCK_CIPHER_NUM_KEYS * RSA_KEY_MESSAGE_LENGTH]*/; // As above, actually BLOCK_CIPHER_KEY_LENGTH but encrypted.
+            public ushort nEncryption;                  // Matches one of EHeaderEncryptionType: 0 = No encryption/extension
+            public ushort nSigning;                     // Matches one of EHeaderSignatureType: 0 = No signing
         }
 
         // Header for HEADERS_SIGNED_CDR technique implemented on consoles. The comment section needs to contain the following in order:
         // CryCustomExtendedHeader, CrySignedCDRHeader
         unsafe struct CrySignedCDRHeader
         {
-            public const int SizeOf = 4 + RSA_KEY_MESSAGE_LENGTH;
-            public uint nHeaderSize;                    // Size of the extended header.
+            public const ushort SizeOf = 4 + RSA_KEY_MESSAGE_LENGTH;
+            public uint nHeaderSize; // Size of the extended header.
             public byte[] CDR_signed/*[RSA_KEY_MESSAGE_LENGTH]*/;
         }
 
-        // Stores type of encryption and signing
-        struct CryCustomExtendedHeader
+        internal unsafe struct CryCustomTeaEncryptionHeader
         {
-            public const int SizeOf = 8;
-            public uint nHeaderSize;                    // Size of the extended header.
-            public ushort nEncryption;                  // Matches one of EHeaderEncryptionType: 0 = No encryption/extension
-            public ushort nSigning;                     // Matches one of EHeaderSignatureType: 0 = No signing
+            public const ushort SizeOf = 4 + 172; //172
+            public uint nHeaderSize; // Size of the extended header.
+            public byte[] Unknown/*[172]*/;
         }
 
-        unsafe struct CryCustomTeaEncryptionHeader
+        // Header for HEADERS_ENCRYPTED_CRYCUSTOM technique. Paired with a CrySignedCDRHeader to allow for signing as well as encryption.
+        // i.e. the comment section for a file that uses this technique needs the following in order:
+        // CryCustomExtendedHeader, CrySignedCDRHeader, CryCustomEncryptionHeader
+        internal unsafe struct CryCustomEncryptionHeader
         {
-            public const int SizeOf = 4 + 2352;
-            public uint nHeaderSize;                    // Size of the extended header.
-            public byte[] Data/*[2352]*/;
+            public const ushort SizeOf = 4 + RSA_KEY_MESSAGE_LENGTH + BLOCK_CIPHER_NUM_KEYS * RSA_KEY_MESSAGE_LENGTH;
+            public const ushort SizeOf2 = 8;
+            public uint nHeaderSize; // Size of the extended header.
+            public byte[] CDR_IV/*[RSA_KEY_MESSAGE_LENGTH]*/; // Initial Vector is actually BLOCK_CIPHER_KEY_LENGTH bytes in length, but is encrypted as a RSA_KEY_MESSAGE_LENGTH byte message.
+            public byte[] keys_table/*[BLOCK_CIPHER_NUM_KEYS * RSA_KEY_MESSAGE_LENGTH]*/; // As above, actually BLOCK_CIPHER_KEY_LENGTH but encrypted.
+            // Hunt: Shadow
+            public uint Unknown1;
+            public uint Unknown2;
         }
 
-        CryCustomEncryptionHeader _headerEncryption;
         CrySignedCDRHeader _headerSignature;
         CryCustomExtendedHeader _headerExtended;
+        CryCustomEncryptionHeader _headerEncryption;
         CryCustomTeaEncryptionHeader _headerTeaEncryption;
         byte[] CryCustomIV;
         byte[][] CryCustomKeys;
@@ -838,9 +805,10 @@ namespace ICSharpCode.SharpZipLib.Zip
                 var bytes = _baseStream.ReadBytes(nSize);
                 switch (_encryptedHeaders)
                 {
-                    case EHeaderEncryptionType.HEADERS_ENCRYPTED_TEA: fixed (byte* _ = bytes) ZipDir.TeaDecrypt(_, nSize); break;
+                    case EHeaderEncryptionType.HEADERS_ENCRYPTED_TEA: ZipDir.TeaDecrypt(ref bytes, nSize, _headerTeaEncryption); break;
                     case EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER: ZipDir.StreamCipher(ref bytes, nSize, GetReferenceCRCForPak()); break;
-                    case EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE: if (!ZipEncrypt.DecryptBufferWithStreamCipher(ref bytes, nSize, CryCustomKeys[0], CryCustomIV)) { Console.WriteLine("Failed to decrypt pak header"); return false; } break;
+                    case EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE:
+                    case EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE2: if (!ZipEncrypt.DecryptBufferWithStreamCipher(ref bytes, nSize, CryCustomKeys[0], CryCustomIV)) { Console.WriteLine("Failed to decrypt pak header"); return false; } break;
                     default: Console.WriteLine("Attempting to load encrypted pak by unsupported method"); return false;
                 }
                 _stream = new MemoryStream(bytes);
@@ -848,6 +816,7 @@ namespace ICSharpCode.SharpZipLib.Zip
             switch (_signedHeaders)
             {
                 case EHeaderSignatureType.HEADERS_CDR_SIGNED:
+                case EHeaderSignatureType.HEADERS_CDR_SIGNED2:
                     // Verify CDR signature & pak name
                     var pathSepIdx = Math.Max(Name.LastIndexOf('\\'), Name.LastIndexOf('/'));
                     var pathSep = Name.Substring(pathSepIdx + 1);
@@ -872,10 +841,10 @@ namespace ICSharpCode.SharpZipLib.Zip
 
         private unsafe T ReadLET<T>(int sizeOf, Func<T> func) where T : struct
         {
-            return func();
-            //if (!BitConverter.IsLittleEndian) return func();
-            //var bytes = _stream.ReadBytes(sizeOf);
-            //fixed (byte* src = bytes) return Marshal.PtrToStructure<T>(new IntPtr(src));
+            //return func();
+            if (!BitConverter.IsLittleEndian) return func();
+            var bytes = _stream.ReadBytes(sizeOf);
+            fixed (byte* src = bytes) return Marshal.PtrToStructure<T>(new IntPtr(src));
         }
 
         /// <summary>
@@ -1016,9 +985,10 @@ namespace ICSharpCode.SharpZipLib.Zip
 
                 // Prepare for a quick sanity check on the size of the comment field now that we know what it should contain
                 // Also check that the techniques are supported
-                ushort expectedCommentLength = CryCustomExtendedHeader.SizeOf;
+                var expectedCommentLength = CryCustomExtendedHeader.SizeOf;
                 // Encryption technique has been specified in both the disk number (old technique) and the custom header (new technique).
-                if (_encryptedHeaders != EHeaderEncryptionType.HEADERS_ENCRYPTED_TEA && _headerExtended.nEncryption != (ushort)EHeaderEncryptionType.HEADERS_NOT_ENCRYPTED && _encryptedHeaders != EHeaderEncryptionType.HEADERS_NOT_ENCRYPTED)
+                if (_encryptedHeaders != EHeaderEncryptionType.HEADERS_ENCRYPTED_TEA &&
+                    _headerExtended.nEncryption != (ushort)EHeaderEncryptionType.HEADERS_NOT_ENCRYPTED && _encryptedHeaders != EHeaderEncryptionType.HEADERS_NOT_ENCRYPTED)
                     throw new ZipException("Unexpected encryption technique in header");
                 else
                 {
@@ -1027,9 +997,13 @@ namespace ICSharpCode.SharpZipLib.Zip
                     switch (_encryptedHeaders)
                     {
                         case EHeaderEncryptionType.HEADERS_NOT_ENCRYPTED: break;
-                        case EHeaderEncryptionType.HEADERS_ENCRYPTED_TEA: expectedCommentLength += CryCustomTeaEncryptionHeader.SizeOf; break;
-                        case EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE: expectedCommentLength += CryCustomEncryptionHeader.SizeOf; break;
-                        case EHeaderEncryptionType.HEADERS_ENCRYPTED_NEWHUNT: throw new ZipException("UNKNOWN");
+                        case EHeaderEncryptionType.HEADERS_ENCRYPTED_TEA: expectedCommentLength += CryCustomTeaEncryptionHeader.SizeOf; goto case EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE;
+                        case EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE:
+                        case EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE2:
+                            var hasSize2 = _encryptedHeaders == EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE2;
+                            expectedCommentLength += CryCustomEncryptionHeader.SizeOf;
+                            if (hasSize2) expectedCommentLength += CryCustomEncryptionHeader.SizeOf2;
+                            break;
                         // Unexpected technique
                         default: throw new ZipException("Unexpected encryption technique in header");
                     }
@@ -1039,15 +1013,15 @@ namespace ICSharpCode.SharpZipLib.Zip
                 switch (_signedHeaders)
                 {
                     case EHeaderSignatureType.HEADERS_NOT_SIGNED: break;
-                    case EHeaderSignatureType.HEADERS_CDR_SIGNED: expectedCommentLength += CrySignedCDRHeader.SizeOf; break;
-                    case EHeaderSignatureType.HEADERS_NEWHUNT: throw new ZipException("UNKNOWN");
+                    case EHeaderSignatureType.HEADERS_CDR_SIGNED: case EHeaderSignatureType.HEADERS_CDR_SIGNED2: expectedCommentLength += CrySignedCDRHeader.SizeOf; break;
                     // Unexpected technique
                     default: throw new ZipException("Bad signing technique in header");
                 }
 
                 if (cdr.commentSize == expectedCommentLength)
                 {
-                    if (_signedHeaders == EHeaderSignatureType.HEADERS_CDR_SIGNED)
+                    if (_signedHeaders == EHeaderSignatureType.HEADERS_CDR_SIGNED ||
+                        _signedHeaders == EHeaderSignatureType.HEADERS_CDR_SIGNED2)
                     {
                         _headerSignature = new CrySignedCDRHeader
                         {
@@ -1056,27 +1030,34 @@ namespace ICSharpCode.SharpZipLib.Zip
                         };
                         if (_headerSignature.nHeaderSize != CrySignedCDRHeader.SizeOf) throw new ZipException("Bad signature header");
                     }
-                    if (_encryptedHeaders == EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE)
-                    {
-                        _headerEncryption = new CryCustomEncryptionHeader
-                        {
-                            nHeaderSize = ReadLEUint(),
-                            CDR_IV = _stream.ReadBytes(RSA_KEY_MESSAGE_LENGTH),
-                            keys_table = _stream.ReadBytes(BLOCK_CIPHER_NUM_KEYS * RSA_KEY_MESSAGE_LENGTH)
-                        };
-                        if (_headerEncryption.nHeaderSize != CryCustomEncryptionHeader.SizeOf) throw new ZipException("Bad encryption header");
-
-                        // We have a table of symmetric keys to decrypt
-                        ZipEncrypt.DecryptKeysTable(_aesKey, ref _headerEncryption, out CryCustomIV, out CryCustomKeys);
-                    }
                     if (_encryptedHeaders == EHeaderEncryptionType.HEADERS_ENCRYPTED_TEA)
                     {
                         _headerTeaEncryption = new CryCustomTeaEncryptionHeader
                         {
                             nHeaderSize = ReadLEUint(),
-                            Data = _stream.ReadBytes(2352)
+                            Unknown = _stream.ReadBytes(172),
                         };
-                        if (_headerTeaEncryption.nHeaderSize != CryCustomTeaEncryptionHeader.SizeOf) throw new ZipException("Bad encryption header");
+                        if (_headerTeaEncryption.nHeaderSize != CryCustomTeaEncryptionHeader.SizeOf + CryCustomEncryptionHeader.SizeOf) throw new ZipException("Bad encryption header");
+                    }
+                    if (_encryptedHeaders == EHeaderEncryptionType.HEADERS_ENCRYPTED_TEA ||
+                        _encryptedHeaders == EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE ||
+                        _encryptedHeaders == EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE2)
+                    {
+                        var hasSize2 = _encryptedHeaders == EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE2;
+                        _headerEncryption = new CryCustomEncryptionHeader
+                        {
+                            nHeaderSize = ReadLEUint(),
+                            CDR_IV = _stream.ReadBytes(RSA_KEY_MESSAGE_LENGTH),
+                            keys_table = _stream.ReadBytes(BLOCK_CIPHER_NUM_KEYS * RSA_KEY_MESSAGE_LENGTH),
+                            Unknown1 = hasSize2 ? ReadLEUint() : 0,
+                            Unknown2 = hasSize2 ? ReadLEUint() : 0,
+                        };
+                        if (_encryptedHeaders != EHeaderEncryptionType.HEADERS_ENCRYPTED_TEA &&
+                            _headerEncryption.nHeaderSize != CryCustomEncryptionHeader.SizeOf + (hasSize2 ? CryCustomEncryptionHeader.SizeOf2 : 0)) throw new ZipException("Bad encryption header");
+
+                        // We have a table of symmetric keys to decrypt
+                        var sha256 = _encryptedHeaders != EHeaderEncryptionType.HEADERS_ENCRYPTED_TEA;
+                        ZipEncrypt.DecryptKeysTable(_aesKey, ref _headerEncryption, sha256, out CryCustomIV, out CryCustomKeys);
                     }
                 }
                 // Unexpected technique
@@ -1152,26 +1133,25 @@ namespace ICSharpCode.SharpZipLib.Zip
 
             for (var i = 0U; i < cdr.entriesForThisDisk; i++)
             {
-                var head = ReadLET(CentralFileHeader.SizeOf, () =>
-                    new CentralFileHeader
-                    {
-                        signature = ReadLEUint(),
-                        versionMadeBy = ReadLEUshort(),
-                        versionToExtract = ReadLEUshort(),
-                        bitFlags = ReadLEUshort(),
-                        method = ReadLEUshort(),
-                        dostime = ReadLEUint(),
-                        crc = ReadLEUint(),
-                        csize = ReadLEUint(),
-                        size = ReadLEUint(),
-                        nameLen = ReadLEUshort(),
-                        extraLen = ReadLEUshort(),
-                        commentLen = ReadLEUshort(),
-                        diskStartNo = ReadLEUshort(),
-                        internalAttributes = ReadLEUshort(),
-                        externalAttributes = ReadLEUint(),
-                        offset = ReadLEUint(),
-                    });
+                var head = new CentralFileHeader
+                {
+                    signature = ReadLEUint(),
+                    versionMadeBy = ReadLEUshort(),
+                    versionToExtract = ReadLEUshort(),
+                    bitFlags = ReadLEUshort(),
+                    method = ReadLEUshort(),
+                    dostime = ReadLEUint(),
+                    crc = ReadLEUint(),
+                    csize = ReadLEUint(),
+                    size = ReadLEUint(),
+                    nameLen = ReadLEUshort(),
+                    extraLen = ReadLEUshort(),
+                    commentLen = ReadLEUshort(),
+                    diskStartNo = ReadLEUshort(),
+                    internalAttributes = ReadLEUshort(),
+                    externalAttributes = ReadLEUint(),
+                    offset = ReadLEUint(),
+                };
                 if (head.signature != ZipConstants.CentralHeaderSignature) throw new ZipException("Wrong Central Directory signature");
 
                 if ((head.versionToExtract & 0xFF) > 20) throw new ZipException("Cannot read the archive file (nVersionNeeded > 20).");
