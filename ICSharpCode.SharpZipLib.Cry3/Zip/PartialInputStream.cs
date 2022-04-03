@@ -38,7 +38,7 @@ namespace ICSharpCode.SharpZipLib.Zip
             // Stream reader = z.GetInputStream(0);
             // uses reader here....
             zipFile_ = zipFile;
-            baseStream_ = zipFile_._baseStream;
+            baseStream_ = zipFile_._stream;
             readPos_ = start;
             end_ = start + length;
         }

@@ -3,6 +3,7 @@ using ICSharpCode.SharpZipLib.Core;
 using ICSharpCode.SharpZipLib.Zip.Compression;
 using ICSharpCode.SharpZipLib.Zip.Compression.Streams;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -21,11 +22,11 @@ namespace ICSharpCode.SharpZipLib.Zip
     {
         static readonly StringCodec CompatCodec = new StringCodec();
         StringCodec _stringCodecLocal = CompatCodec;
-        internal Stream _baseStream;
+        Stream _baseStream;
         ZipEntry[] _entries;
         StringCodec __stringCodec;
         long _offsetOfFirstEntry;
-        Stream _stream;
+        internal Stream _stream;
         byte[] _aesKey;
 
         #region base
@@ -295,13 +296,8 @@ namespace ICSharpCode.SharpZipLib.Zip
         /// <exception cref="ArgumentNullException"><paramref name="fileName"></paramref> is null</exception>
         public new static ZipFile Create(string fileName)
         {
-            if (fileName == null)
-            {
-                throw new ArgumentNullException(nameof(fileName));
-            }
-
-            FileStream fs = File.Create(fileName);
-
+            if (fileName == null) throw new ArgumentNullException(nameof(fileName));
+            var fs = File.Create(fileName);
             return new Cry3File
             {
                 name_ = fileName,
@@ -319,20 +315,9 @@ namespace ICSharpCode.SharpZipLib.Zip
         /// <exception cref="ArgumentException"><paramref name="outStream"> doesnt support writing.</paramref></exception>
         public new static ZipFile Create(Stream outStream)
         {
-            if (outStream == null)
-            {
-                throw new ArgumentNullException(nameof(outStream));
-            }
-
-            if (!outStream.CanWrite)
-            {
-                throw new ArgumentException("Stream is not writeable", nameof(outStream));
-            }
-
-            if (!outStream.CanSeek)
-            {
-                throw new ArgumentException("Stream is not seekable", nameof(outStream));
-            }
+            if (outStream == null) throw new ArgumentNullException(nameof(outStream));
+            if (!outStream.CanWrite) throw new ArgumentException("Stream is not writeable", nameof(outStream));
+            if (!outStream.CanSeek) throw new ArgumentException("Stream is not seekable", nameof(outStream));
 
             var result = new Cry3File
             {
@@ -362,24 +347,14 @@ namespace ICSharpCode.SharpZipLib.Zip
         /// </exception>
         public new Stream GetInputStream(ZipEntry entry)
         {
-            if (entry == null)
-            {
-                throw new ArgumentNullException(nameof(entry));
-            }
+            if (entry == null) throw new ArgumentNullException(nameof(entry));
+            if (isDisposed_) throw new ObjectDisposedException("ZipFile");
 
-            if (isDisposed_)
-            {
-                throw new ObjectDisposedException("ZipFile");
-            }
-
-            long index = entry.ZipFileIndex;
-            if ((index < 0) || (index >= _entries.Length) || (_entries[index].Name != entry.Name))
+            var index = entry.ZipFileIndex;
+            if (index < 0 || index >= _entries.Length || _entries[index].Name != entry.Name)
             {
                 index = FindEntry(entry.Name, true);
-                if (index < 0)
-                {
-                    throw new ZipException("Entry cannot be found");
-                }
+                if (index < 0) throw new ZipException("Entry cannot be found");
             }
             return GetInputStream(index);
         }
@@ -407,19 +382,26 @@ namespace ICSharpCode.SharpZipLib.Zip
             var entry = _entries[entryIndex];
             var start = LocateEntry(entry);
             var method = entry.CompressionMethod;
+
             Stream result;
-            if ((int)method < METHOD_DEFLATE_AND_ENCRYPT || (int)method > METHOD_DEFLATE_AND_STREAMCIPHER_KEYTABLE)
+            if (((int)method < METHOD_DEFLATE_AND_ENCRYPT || (int)method > METHOD_DEFLATE_AND_STREAMCIPHER_KEYTABLE))
+            {
+                _stream = _baseStream;
                 result = new PartialInputStream(this, start, entry.CompressedSize);
+            }
             else
             {
-                var compressed = _stream.ReadBytes((int)entry.CompressedSize);
+                _baseStream.Seek(start, SeekOrigin.Begin);
+                var compressed = _baseStream.ReadBytes((int)entry.CompressedSize);
                 switch ((int)method)
                 {
                     case METHOD_STORE_AND_STREAMCIPHER_KEYTABLE:
                         ZipDir.StreamCipher(ref compressed, 0); //: entry
+                        method = CompressionMethod.Stored;
                         break;
                     case METHOD_DEFLATE_AND_ENCRYPT:
                         fixed (byte* _ = compressed) ZipDir.TeaDecrypt(_, (int)entry.CompressedSize);
+                        method = CompressionMethod.Deflated;
                         break;
                     case METHOD_DEFLATE_AND_STREAMCIPHER:
                     case METHOD_DEFLATE_AND_STREAMCIPHER_KEYTABLE:
@@ -427,9 +409,11 @@ namespace ICSharpCode.SharpZipLib.Zip
                         ZipEncrypt.GetEncryptionInitialVector(entry, out var IV);
                         // Decryption failed - Don't give a clue about the encryption support
                         if (!ZipEncrypt.DecryptBufferWithStreamCipher(ref compressed, (int)entry.CompressedSize, CryCustomKeys[keyIndex], IV)) throw new ZipException("Data is corrupt");
+                        method = CompressionMethod.Deflated;
                         break;
                 }
-                result = new PartialInputStream(this, start, entry.CompressedSize);
+                _stream = new MemoryStream(compressed);
+                result = new PartialInputStream(this, 0, entry.CompressedSize);
             }
 
             if (entry.IsCrypted == true)
@@ -567,27 +551,14 @@ namespace ICSharpCode.SharpZipLib.Zip
         /// <returns>The offset of the entries data in the file</returns>
         private long TestLocalHeader(Cry3Entry entry, HeaderTest tests)
         {
-            _stream = _baseStream;
             lock (_baseStream)
             {
                 if (_encryptedHeaders != EHeaderEncryptionType.HEADERS_NOT_ENCRYPTED)
                 {
                     // use CDR instead of local header
                     // The pak encryption tool asserts that there is no extra data at the end of the local file header, so don't add any extra data from the CDR header.
-                    entry.Offset = _offsetOfFirstEntry + entry.OffsetAfterNameLen;
-                    _baseStream.Seek(entry.Offset, SeekOrigin.Begin);
-                    var signature2 = (int)ReadLEUint();
-                    //if (signature2 != ZipConstants.LocalHeaderSignature) throw new ZipException($"Wrong local header signature at 0x{entryAbsOffset:x}, expected 0x{ZipConstants.LocalHeaderSignature:x8}, actual 0x{signature:x8}");
-                    var extractVersion2 = (short)(ReadLEUshort() & 0x00ff);
-                    var localFlags2 = (short)ReadLEUshort();
-                    var compressionMethod2 = (short)ReadLEUshort();
-                    var fileTime2 = (short)ReadLEUshort();
-                    var fileDate2 = (short)ReadLEUshort();
-                    uint crcValue2 = ReadLEUint();
-                    long compressedSize2 = ReadLEUint();
-                    long size2 = ReadLEUint();
-                    int storedNameLength2 = ReadLEUshort();
-                    int extraDataLength2 = ReadLEUshort();
+                    var fileDataOffset = _offsetOfFirstEntry + entry.OffsetAfterNameLen;
+                    return fileDataOffset;
                 }
 
                 var testHeader = (tests & HeaderTest.Header) != 0;
@@ -595,6 +566,7 @@ namespace ICSharpCode.SharpZipLib.Zip
 
                 var entryAbsOffset = _offsetOfFirstEntry + entry.Offset;
 
+                _stream = _baseStream;
                 _baseStream.Seek(entryAbsOffset, SeekOrigin.Begin);
                 var signature = (int)ReadLEUint();
 
@@ -900,9 +872,10 @@ namespace ICSharpCode.SharpZipLib.Zip
 
         private unsafe T ReadLET<T>(int sizeOf, Func<T> func) where T : struct
         {
-            if (!BitConverter.IsLittleEndian) return func();
-            var bytes = _stream.ReadBytes(sizeOf);
-            fixed (byte* src = bytes) return Marshal.PtrToStructure<T>(new IntPtr(src));
+            return func();
+            //if (!BitConverter.IsLittleEndian) return func();
+            //var bytes = _stream.ReadBytes(sizeOf);
+            //fixed (byte* src = bytes) return Marshal.PtrToStructure<T>(new IntPtr(src));
         }
 
         /// <summary>
