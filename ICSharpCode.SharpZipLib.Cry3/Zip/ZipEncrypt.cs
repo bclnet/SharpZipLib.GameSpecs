@@ -126,12 +126,15 @@ namespace ICSharpCode.SharpZipLib.Zip
             return PublicKeyFactory.CreateKey(new SubjectPublicKeyInfo(algId ?? new AlgorithmIdentifier(PkcsObjectIdentifiers.RsaEncryption), keyData.GetBytes()));
         }
 
-        internal static bool DecryptKeysTable(byte[] aesKey, ref CryCustomEncryptionHeader headerEncryption, bool sha256, out byte[] cdrIV, out byte[][] keysTable)
+        internal static bool DecryptKeysTable(byte[] aesKey, ref CryCustomEncryptionHeader headerEncryption, int digestSize, out byte[] cdrIV, out byte[][] keysTable)
         {
+            var digest = digestSize == -5 ? new MD5Digest()
+                : digestSize == 256 ? (IDigest)new Sha256Digest()
+                : new Sha1Digest();
             try
             {
                 var publicKey = GetPublicKey(aesKey ?? _RsaKey);
-                var cipher = new OaepEncoding(new RsaEngine(), sha256 ? (IDigest)new Sha256Digest() : new Sha1Digest());
+                var cipher = new OaepEncoding(new RsaEngine(), digest);
                 cipher.Init(false, publicKey);
                 cdrIV = cipher.ProcessBlock(headerEncryption.CDR_IV, 0, RSA_KEY_MESSAGE_LENGTH);
 

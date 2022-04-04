@@ -1053,11 +1053,14 @@ namespace ICSharpCode.SharpZipLib.Zip
                             Unknown2 = hasSize2 ? ReadLEUint() : 0,
                         };
                         if (_encryptedHeaders != EHeaderEncryptionType.HEADERS_ENCRYPTED_TEA &&
-                            _headerEncryption.nHeaderSize != CryCustomEncryptionHeader.SizeOf + (hasSize2 ? CryCustomEncryptionHeader.SizeOf2 : 0)) throw new ZipException("Bad encryption header");
+                            _headerEncryption.nHeaderSize != CryCustomEncryptionHeader.SizeOf + (hasSize2 ? CryCustomEncryptionHeader.SizeOf2 : 0))
+                            throw new ZipException("Bad encryption header");
 
                         // We have a table of symmetric keys to decrypt
-                        var sha256 = _encryptedHeaders != EHeaderEncryptionType.HEADERS_ENCRYPTED_TEA;
-                        ZipEncrypt.DecryptKeysTable(_aesKey, ref _headerEncryption, sha256, out CryCustomIV, out CryCustomKeys);
+                        var digestSize = _encryptedHeaders == EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE2 ? -5
+                            : _encryptedHeaders == EHeaderEncryptionType.HEADERS_ENCRYPTED_TEA ? 1
+                            : 256;
+                        ZipEncrypt.DecryptKeysTable(_aesKey, ref _headerEncryption, digestSize, out CryCustomIV, out CryCustomKeys);
                     }
                 }
                 // Unexpected technique
