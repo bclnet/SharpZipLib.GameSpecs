@@ -8,7 +8,7 @@ namespace Org.BouncyCastle.Crypto.Modes
     * Implements the Segmented Integer Counter (SIC) mode on top of a simple
     * block cipher.
     */
-    public class SicRevBlockCipher
+    internal class SicRevBlockCipher
         : IBlockCipher
     {
         private readonly IBlockCipher cipher;

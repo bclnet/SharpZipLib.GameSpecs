@@ -48,7 +48,7 @@ foreach (ZipEntry ent in pak)
     {
         // create directory
         using var input = pak.GetInputStream(ent);
-        var newPath = Path.Combine(@"C:\T_\Crysis\", ent.Name);
+        var newPath = Path.Combine(@"D:\T_\GameSpec\Wolcen\", ent.Name);
         var directory = Path.GetDirectoryName(newPath);
         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory)) Directory.CreateDirectory(directory);
         using var s = new FileStream(newPath, FileMode.Create, FileAccess.Write);

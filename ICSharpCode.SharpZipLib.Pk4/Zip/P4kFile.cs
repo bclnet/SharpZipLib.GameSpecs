@@ -25,7 +25,6 @@ namespace ICSharpCode.SharpZipLib.Zip
 
         #region base
 
-        static readonly Type ZipFormatType = typeof(ZipFile).Assembly.GetType("ICSharpCode.SharpZipLib.Zip.ZipFormat", true);
         static readonly FieldInfo isDisposed_Field = typeof(ZipFile).GetField("isDisposed_", BindingFlags.NonPublic | BindingFlags.Instance);
         static readonly FieldInfo name_Field = typeof(ZipFile).GetField("name_", BindingFlags.NonPublic | BindingFlags.Instance);
         static readonly FieldInfo comment_Field = typeof(ZipFile).GetField("comment_", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -39,7 +38,7 @@ namespace ICSharpCode.SharpZipLib.Zip
         static readonly FieldInfo isNewArchive_Field = typeof(ZipFile).GetField("isNewArchive_", BindingFlags.NonPublic | BindingFlags.Instance);
         static readonly MethodInfo DisposeInternalMethod = typeof(ZipFile).GetMethod("DisposeInternal", BindingFlags.NonPublic | BindingFlags.Instance);
         static readonly MethodInfo CreateAndInitDecryptionStreamMethod = typeof(ZipFile).GetMethod("CreateAndInitDecryptionStream", BindingFlags.NonPublic | BindingFlags.Instance);
-        static readonly MethodInfo ZipFormat_LocateBlockWithSignature = ZipFormatType.GetMethod("LocateBlockWithSignature", BindingFlags.NonPublic | BindingFlags.Static);
+        static readonly MethodInfo LocateBlockWithSignatureMethod = typeof(ZipFile).GetMethod("LocateBlockWithSignature", BindingFlags.NonPublic | BindingFlags.Instance);
 
         bool isDisposed_ => (bool)isDisposed_Field.GetValue(this);
         string name_
@@ -90,8 +89,7 @@ namespace ICSharpCode.SharpZipLib.Zip
 
         void DisposeInternal(bool disposing) => DisposeInternalMethod.Invoke(this, new object[] { disposing });
         Stream CreateAndInitDecryptionStream(Stream baseStream, ZipEntry entry) => (Stream)CreateAndInitDecryptionStreamMethod.Invoke(this, new object[] { baseStream, entry });
-        long LocateBlockWithSignature(int signature, long endLocation, int minimumBlockSize, int maximumVariableData)
-            => (long)ZipFormat_LocateBlockWithSignature.Invoke(null, new object[] { baseStream_, signature, endLocation, minimumBlockSize, maximumVariableData });
+        long LocateBlockWithSignature(int signature, long endLocation, int minimumBlockSize, int maximumVariableData) => (long)LocateBlockWithSignatureMethod.Invoke(this, new object[] { signature, endLocation, minimumBlockSize, maximumVariableData });
 
         #endregion
 
@@ -111,7 +109,7 @@ namespace ICSharpCode.SharpZipLib.Zip
         /// <exception cref="ZipException">
         /// The file doesn't contain a valid zip archive.
         /// </exception>
-        public P4kFile(string name, StringCodec stringCodec = null)
+        internal P4kFile(string name, StringCodec stringCodec = null)
             : base(EmptyStreamHack, false)
         {
             isNewArchive_ = false;
