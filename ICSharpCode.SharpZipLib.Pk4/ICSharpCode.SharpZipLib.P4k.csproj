@@ -3,10 +3,15 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <AssemblyVersion>0.0.0.1</AssemblyVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <PackageProjectUrl></PackageProjectUrl>
+    <RepositoryUrl>https://github.com/bclnet/SharpZipLib.GameSpecs</RepositoryUrl>
+    <Description>extends #ziplib for proprietary game formats library written entirely in C# for the .NET platform.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Portable.BouncyCastle" Version="1.9.0" />
     <PackageReference Include="ZstdNet" Version="1.4.5" />
   </ItemGroup>
 
