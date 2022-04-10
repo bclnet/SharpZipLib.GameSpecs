@@ -37,6 +37,14 @@ namespace ICSharpCode.SharpZipLib.Zip
 
 		#endregion
 
+		/// <summary>
+		/// ZStd compression.
+		/// </summary>
+		public const CompressionMethod CompressionMethod_ZStd = (CompressionMethod)93;
+
+		//0xFD2FB528 LE
+		public static bool IsZstdStream(byte[] bytes, long length) => bytes.Length > 3 && bytes[0] == 0x28 && bytes[1] == 0xB5 && bytes[2] == 0x2F && bytes[3] == 0xFD;
+
 		// Extensions: Encoding
 		public static bool IsZipUnicode(this Encoding e) => e.Equals(StringCodec.UnicodeZipEncoding);
 	}

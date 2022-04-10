@@ -19,11 +19,11 @@ namespace ICSharpCode.SharpZipLib.Zip
     /// </summary>
     internal unsafe static class ZipEncrypt
     {
-        static bool StartStreamCipher(byte[] key, byte[] iv, out IBufferedCipher cipher)
+        static bool StartStreamCipher(bool useTwoFish, byte[] key, byte[] iv, out IBufferedCipher cipher)
         {
             try
             {
-                cipher = new BufferedBlockCipher(new SicRevBlockCipher(new TwofishEngine()));
+                cipher = new BufferedBlockCipher(new SicRevBlockCipher(useTwoFish ? (IBlockCipher)new TwofishEngine() : new AesEngine()));
                 cipher.Init(false, new ParametersWithIV(new KeyParameter(key), iv));
             }
             catch (CryptoException ex) { Console.WriteLine(ex.Message); cipher = default; return false; }
@@ -40,9 +40,9 @@ namespace ICSharpCode.SharpZipLib.Zip
             catch (CryptoException ex) { Console.WriteLine(ex.Message); return false; }
         }
 
-        internal static bool DecryptBufferWithStreamCipher(ref byte[] data, int size, byte[] key, byte[] iv)
+        internal static bool DecryptBufferWithStreamCipher(ref byte[] data, int size, bool useTwoFish, byte[] key, byte[] iv)
         {
-            if (!StartStreamCipher(key, iv, out var cipher)) return false;
+            if (!StartStreamCipher(useTwoFish, key, iv, out var cipher)) return false;
             if (!DecryptBufferWithStreamCipher(ref data, size, cipher)) return false;
             return true;
         }
@@ -128,7 +128,7 @@ namespace ICSharpCode.SharpZipLib.Zip
 
         internal static bool DecryptKeysTable(byte[] aesKey, ref CryCustomEncryptionHeader headerEncryption, int digestSize, out byte[] cdrIV, out byte[][] keysTable)
         {
-            var digest = digestSize == -5 ? new MD5Digest()
+            var digest = digestSize == 257 ? new Blake2bDigest()
                 : digestSize == 256 ? (IDigest)new Sha256Digest()
                 : new Sha1Digest();
             try
