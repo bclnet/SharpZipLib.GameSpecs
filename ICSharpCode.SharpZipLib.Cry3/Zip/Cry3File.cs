@@ -846,6 +846,7 @@ namespace ICSharpCode.SharpZipLib.Zip
             {
                 case EHeaderSignatureType.HEADERS_CDR_SIGNED:
                 case EHeaderSignatureType.HEADERS_CDR_SIGNED2:
+                    if (Name == null) break;
                     // Verify CDR signature & pak name
                     var pathSepIdx = Math.Max(Name.LastIndexOf('\\'), Name.LastIndexOf('/'));
                     var pathSep = Name.Substring(pathSepIdx + 1);
