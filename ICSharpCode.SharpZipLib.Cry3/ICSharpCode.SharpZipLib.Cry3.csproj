@@ -9,7 +9,7 @@
     <Description>extends #ziplib for proprietary game formats library written entirely in C# for the .NET platform.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageId>SharpZipLib.Cry3</PackageId>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
 	<Authors>bclnet</Authors>
   </PropertyGroup>
 

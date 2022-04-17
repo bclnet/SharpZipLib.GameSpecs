@@ -17,10 +17,10 @@ namespace ICSharpCode.SharpZipLib.Zip
     public class P4kFile : ZipFile
     {
         static readonly StringCodec CompatCodec = new StringCodec();
-        StringCodec _stringCodecLocal = CompatCodec;
+        //StringCodec _stringCodecLocal = CompatCodec;
         internal Stream _baseStream;
         ZipEntry[] _entries;
-        StringCodec __stringCodec;
+        StringCodec __stringCodec = CompatCodec;
         long _offsetOfFirstEntry;
 
         #region base
@@ -33,8 +33,8 @@ namespace ICSharpCode.SharpZipLib.Zip
         static readonly FieldInfo offsetOfFirstEntryField = typeof(ZipFile).GetField("offsetOfFirstEntry", BindingFlags.NonPublic | BindingFlags.Instance);
         static readonly FieldInfo entries_Field = typeof(ZipFile).GetField("entries_", BindingFlags.NonPublic | BindingFlags.Instance);
         static readonly FieldInfo keyField = typeof(ZipFile).GetField("key", BindingFlags.NonPublic | BindingFlags.Instance);
-        static readonly FieldInfo _stringCodecField = typeof(ZipFile).GetField("_stringCodec", BindingFlags.NonPublic | BindingFlags.Instance) ??
-            typeof(P4kFile).GetField("_stringCodecLocal", BindingFlags.NonPublic | BindingFlags.Instance);
+        //static readonly FieldInfo _stringCodecField = typeof(ZipFile).GetField("_stringCodec", BindingFlags.NonPublic | BindingFlags.Instance) ??
+        //    typeof(P4kFile).GetField("_stringCodecLocal", BindingFlags.NonPublic | BindingFlags.Instance);
         static readonly FieldInfo isNewArchive_Field = typeof(ZipFile).GetField("isNewArchive_", BindingFlags.NonPublic | BindingFlags.Instance);
         static readonly MethodInfo DisposeInternalMethod = typeof(ZipFile).GetMethod("DisposeInternal", BindingFlags.NonPublic | BindingFlags.Instance);
         static readonly MethodInfo CreateAndInitDecryptionStreamMethod = typeof(ZipFile).GetMethod("CreateAndInitDecryptionStream", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -76,11 +76,11 @@ namespace ICSharpCode.SharpZipLib.Zip
             get => (byte[])keyField.GetValue(this);
             set => keyField.SetValue(this, value);
         }
-        StringCodec _stringCodec
-        {
-            get => (StringCodec)_stringCodecField.GetValue(this);
-            set => _stringCodecField.SetValue(this, value);
-        }
+        //StringCodec _stringCodec
+        //{
+        //    get => (StringCodec)_stringCodecField.GetValue(this);
+        //    set => _stringCodecField.SetValue(this, value);
+        //}
         bool isNewArchive_
         {
             get => (bool)isNewArchive_Field.GetValue(this);
@@ -101,6 +101,7 @@ namespace ICSharpCode.SharpZipLib.Zip
         /// Opens a Zip file with the given name for reading.
         /// </summary>
         /// <param name="name">The name of the file to open.</param>
+        /// <param name="aesKey">The <see cref="byte[]"/> to use as the key.</param>
         /// <param name="stringCodec"></param>
         /// <exception cref="ArgumentNullException">The argument supplied is null.</exception>
         /// <exception cref="IOException">
@@ -109,18 +110,18 @@ namespace ICSharpCode.SharpZipLib.Zip
         /// <exception cref="ZipException">
         /// The file doesn't contain a valid zip archive.
         /// </exception>
-        internal P4kFile(string name, StringCodec stringCodec = null)
+        internal P4kFile(string name, byte[] aesKey, StringCodec stringCodec = null)
             : base(EmptyStreamHack, false)
         {
             isNewArchive_ = false;
             name_ = name ?? throw new ArgumentNullException(nameof(name));
+            key = aesKey;
 
             EntryFactory = new P4kEntryFactory();
             _baseStream = baseStream_ = File.Open(name, FileMode.Open, FileAccess.Read, FileShare.Read);
-            __stringCodec = _stringCodec;
+            //__stringCodec = _stringCodec;
+            //if (stringCodec != null) __stringCodec = _stringCodec = stringCodec;
             isStreamOwner = true;
-
-            if (stringCodec != null) __stringCodec = _stringCodec = stringCodec;
 
             try
             {
@@ -133,6 +134,7 @@ namespace ICSharpCode.SharpZipLib.Zip
         /// Opens a Zip file reading the given <see cref="FileStream"/>.
         /// </summary>
         /// <param name="file">The <see cref="FileStream"/> to read archive data from.</param>
+        /// <param name="aesKey">The <see cref="byte[]"/> to use as the key.</param>
         /// <exception cref="ArgumentNullException">The supplied argument is null.</exception>
         /// <exception cref="IOException">
         /// An i/o error occurs.
@@ -140,13 +142,14 @@ namespace ICSharpCode.SharpZipLib.Zip
         /// <exception cref="ZipException">
         /// The file doesn't contain a valid zip archive.
         /// </exception>
-        public P4kFile(FileStream file)
-            : this(file, false) { }
+        public P4kFile(FileStream file, byte[] aesKey)
+            : this(file, aesKey, false) { }
 
         /// <summary>
         /// Opens a Zip file reading the given <see cref="FileStream"/>.
         /// </summary>
         /// <param name="file">The <see cref="FileStream"/> to read archive data from.</param>
+        /// <param name="aesKey">The <see cref="byte[]"/> to use as the key.</param>
         /// <param name="leaveOpen">true to leave the <see cref="FileStream">file</see> open when the ZipFile is disposed, false to dispose of it</param>
         /// <exception cref="ArgumentNullException">The supplied argument is null.</exception>
         /// <exception cref="IOException">
@@ -155,17 +158,17 @@ namespace ICSharpCode.SharpZipLib.Zip
         /// <exception cref="ZipException">
         /// The file doesn't contain a valid zip archive.
         /// </exception>
-        public P4kFile(FileStream file, bool leaveOpen)
+        public P4kFile(FileStream file, byte[] aesKey, bool leaveOpen)
             : base(EmptyStreamHack, false)
         {
             isNewArchive_ = false;
             if (file == null) throw new ArgumentNullException(nameof(file));
-
+            key = aesKey;
             if (!file.CanSeek) throw new ArgumentException("Stream is not seekable", nameof(file));
 
             EntryFactory = new P4kEntryFactory();
             _baseStream = baseStream_ = file;
-            __stringCodec = _stringCodec;
+            //__stringCodec = _stringCodec;
             name_ = file.Name;
             isStreamOwner = !leaveOpen;
 
@@ -180,6 +183,7 @@ namespace ICSharpCode.SharpZipLib.Zip
         /// Opens a Zip file reading the given <see cref="Stream"/>.
         /// </summary>
         /// <param name="stream">The <see cref="Stream"/> to read archive data from.</param>
+        /// <param name="aesKey">The <see cref="byte[]"/> to use as the key.</param>
         /// <exception cref="IOException">
         /// An i/o error occurs
         /// </exception>
@@ -192,13 +196,14 @@ namespace ICSharpCode.SharpZipLib.Zip
         /// <exception cref="ArgumentNullException">
         /// The <see cref="Stream">stream</see> argument is null.
         /// </exception>
-        public P4kFile(Stream stream)
-            : this(stream, false) { }
+        public P4kFile(Stream stream, byte[] aesKey)
+            : this(stream, aesKey, false) { }
 
         /// <summary>
         /// Opens a Zip file reading the given <see cref="Stream"/>.
         /// </summary>
         /// <param name="stream">The <see cref="Stream"/> to read archive data from.</param>
+        /// <param name="aesKey">The <see cref="byte[]"/> to use as the key.</param>
         /// <param name="leaveOpen">true to leave the <see cref="Stream">stream</see> open when the ZipFile is disposed, false to dispose of it</param>
         /// <exception cref="IOException">
         /// An i/o error occurs
@@ -212,16 +217,17 @@ namespace ICSharpCode.SharpZipLib.Zip
         /// <exception cref="ArgumentNullException">
         /// The <see cref="Stream">stream</see> argument is null.
         /// </exception>
-        public P4kFile(Stream stream, bool leaveOpen)
+        public P4kFile(Stream stream, byte[] aesKey, bool leaveOpen)
             : base(EmptyStreamHack, false)
         {
             isNewArchive_ = false;
             if (stream == null) throw new ArgumentNullException(nameof(stream));
+            key = aesKey;
             if (!stream.CanSeek) throw new ArgumentException("Stream is not seekable", nameof(stream));
 
             EntryFactory = new P4kEntryFactory();
             _baseStream = baseStream_ = stream;
-            __stringCodec = _stringCodec;
+            //__stringCodec = _stringCodec;
             isStreamOwner = !leaveOpen;
 
             if (_baseStream.Length > 0)
