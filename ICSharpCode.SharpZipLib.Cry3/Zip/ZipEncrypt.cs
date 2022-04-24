@@ -19,38 +19,22 @@ namespace ICSharpCode.SharpZipLib.Zip
     /// </summary>
     internal unsafe static class ZipEncrypt
     {
-        static bool StartStreamCipher(bool useTwoFish, byte[] key, byte[] iv, out IBufferedCipher cipher)
+        public static bool DecryptBufferWithStreamCipher(char engineId, ref byte[] data, int size, byte[] key, byte[] iv)
         {
             try
             {
-                cipher = new BufferedBlockCipher(new SicRevBlockCipher(useTwoFish ? (IBlockCipher)new TwofishEngine() : new AesEngine()));
+                var cipher = new BufferedBlockCipher(new SicRevBlockCipher(engineId == 'A' ? (IBlockCipher)new AesEngine() : new TwofishEngine()));
                 cipher.Init(false, new ParametersWithIV(new KeyParameter(key), iv));
-            }
-            catch (CryptoException ex) { Console.WriteLine(ex.Message); cipher = default; return false; }
-            return true;
-        }
-
-        static bool DecryptBufferWithStreamCipher(ref byte[] data, int size, IBufferedCipher cipher)
-        {
-            try
-            {
                 data = cipher.DoFinal(data, 0, size);
-                return true;
             }
             catch (CryptoException ex) { Console.WriteLine(ex.Message); return false; }
-        }
-
-        internal static bool DecryptBufferWithStreamCipher(ref byte[] data, int size, bool useTwoFish, byte[] key, byte[] iv)
-        {
-            if (!StartStreamCipher(useTwoFish, key, iv, out var cipher)) return false;
-            if (!DecryptBufferWithStreamCipher(ref data, size, cipher)) return false;
             return true;
         }
 
-        internal static int GetEncryptionKeyIndex(ZipEntry fileEntry)
+        public static int GetEncryptionKeyIndex(ZipEntry fileEntry)
             => (int)unchecked(~(fileEntry.Crc >> 2) & 0xF);
 
-        internal static void GetEncryptionInitialVector(ZipEntry fileEntry, out byte[] iv)
+        public static void GetEncryptionInitialVector(ZipEntry fileEntry, out byte[] iv)
         {
             unchecked
             {
@@ -65,7 +49,7 @@ namespace ICSharpCode.SharpZipLib.Zip
             }
         }
 
-        internal static bool RsaVerifyData(byte[][] data, int[] sizes, int numBuffers, byte[] signedHash, int signedHashSize, byte[] publicKey)
+        public static bool RsaVerifyData(byte[][] data, int[] sizes, int numBuffers, byte[] signedHash, int signedHashSize, byte[] publicKey)
         {
             // TODO
             return true;
@@ -74,7 +58,7 @@ namespace ICSharpCode.SharpZipLib.Zip
         #region RSA KEY
 
         // cry
-        public static byte[] _RsaKey = {
+        static byte[] _RsaKey = {
             0x30, 0x81, 0x9F, 0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x01,
             0x05, 0x00, 0x03, 0x81, 0x8D, 0x00, 0x30, 0x81, 0x89, 0x02, 0x81, 0x81, 0x00, 0xA9, 0xD5, 0x90,
             0xA4, 0xBC, 0x92, 0xDB, 0x8C, 0xF1, 0xFC, 0x5A, 0xD5, 0x8F, 0x46, 0x05, 0x52, 0x16, 0xEE, 0xF3,
@@ -86,29 +70,6 @@ namespace ICSharpCode.SharpZipLib.Zip
             0xED, 0x51, 0xFD, 0xB1, 0xEF, 0xE4, 0x95, 0x01, 0x24, 0xAE, 0xC0, 0x6A, 0xFA, 0xE0, 0x5B, 0x19,
             0xD2, 0xE6, 0xF0, 0x22, 0x3B, 0xC3, 0xE7, 0xDD, 0x17, 0x1A, 0x8C, 0xF8, 0xE1, 0x02, 0x03, 0x01,
             0x00, 0x01 };
-
-        // warface
-        //public static byte[] _RsaKey = {
-        //    0x30, 0x81, 0x89, 0x02, 0x81, 0x81, 0x00, 0x9B, 0x60, 0x69, 0x31, 0xDC, 0xF7, 0x02, 0x7A, 0x4D,
-        //    0xC0, 0xE5, 0x26, 0x3B, 0x4A, 0xD0, 0xD8, 0xF4, 0xA4, 0x92, 0xA1, 0x6E, 0x4B, 0x5E, 0xC0, 0x85,
-        //    0x0F, 0x07, 0x4B, 0x4C, 0x3D, 0xA6, 0x27, 0xFF, 0x96, 0x67, 0x6D, 0x23, 0x79, 0xF8, 0x90, 0x62,
-        //    0xDE, 0x6C, 0x91, 0x7F, 0x26, 0x8C, 0xBD, 0x82, 0x24, 0x04, 0xD2, 0x6D, 0x9D, 0x79, 0xBC, 0xB0,
-        //    0x18, 0x2D, 0x4C, 0x96, 0xEE, 0xAF, 0x2B, 0x91, 0x8A, 0x03, 0x00, 0xBF, 0xB8, 0x16, 0x19, 0x62,
-        //    0x2D, 0x15, 0x56, 0xB4, 0xE0, 0x2D, 0x16, 0xFE, 0x0C, 0x7E, 0xD7, 0x2C, 0x01, 0xEE, 0x42, 0x9C,
-        //    0x4C, 0x84, 0x9C, 0x6A, 0x78, 0x6B, 0xCE, 0xC4, 0x4D, 0x6C, 0x50, 0xCB, 0x91, 0x46, 0x48, 0xBB,
-        //    0x66, 0x2D, 0x0B, 0xA2, 0x35, 0x68, 0x00, 0x02, 0xD4, 0x60, 0x50, 0x58, 0xD1, 0xC3, 0x0D, 0xA1,
-        //    0x12, 0x37, 0x82, 0x2A, 0x01, 0xF2, 0xEF, 0x02, 0x03, 0x01, 0x00, 0x01 };
-
-        // snow
-        //public static byte[] _RsaKey = {
-        //    0x30, 0x81, 0x89, 0x02, 0x81, 0x81, 0x00, 0xD5, 0x1E, 0x1D, 0x38, 0x10, 0xC4, 0xA1, 0x12, 0xB2, 0xF2, 0x50, 0x4B, 0x83, 0xE2, 0xF1, 0x24, 0x00, 0x9C, 0x0A, 0xC9, 0xCD, 0x16, 0x61, 0x91, 0x34, 
-        //    0x21, 0xD4, 0xE9, 0x46, 0x23, 0xAD, 0x70, 0x14, 0x59, 0x9D, 0xAF, 0xB0, 0xDC, 0x9F, 0x83, 0x66, 0xD1, 0x64, 0xAD, 0x07, 0x2B, 0x3D, 0xC5, 0xAA, 0x3D, 0x4C, 0xD2, 0x45, 0x42, 0xD5, 0xF6, 0x84, 
-        //    0xE6, 0xA4, 0xF7, 0x47, 0x31, 0x02, 0xDE, 0x2A, 0xCA, 0x11, 0xF6, 0x52, 0x40, 0x15, 0xEC, 0xBD, 0x56, 0x42, 0x48, 0xFC, 0x71, 0x2B, 0x3A, 0x69, 0xB1, 0x5B, 0x78, 0xEF, 0xAA, 0x06, 0x74, 0x82, 
-        //    0x59, 0xDD, 0xE7, 0x7A, 0x75, 0x75, 0x7E, 0x51, 0x3F, 0x7A, 0xC2, 0x1A, 0x01, 0x51, 0xF5, 0x3C, 0x78, 0xFF, 0x45, 0xAB, 0xCC, 0x45, 0xC3, 0xF5, 0x4B, 0xC6, 0x30, 0x5F, 0x42, 0x09, 0x81, 0xF7, 
-        //    0x11, 0x9A, 0xF0, 0x3E, 0x64, 0x38, 0xD7, 0x02, 0x03, 0x01, 0x00, 0x01 };
-
-        // wolcen
-        //30818902818100E2725EF9BB168871C238D91B64CFB8B1332F1BBCF105F40F252FB93F3A609D524CF8F5EE09BC554FD918DB8BB3531D6F88BEFEA4BFBDF51CB1E1DF5E5DFA83FD6584D37E279924224FC4F8BB6C98ED50D27002E8BA21F35F0155A08D9ED276714032AEECDA066C17FA54F1C33E5DAF8B332B3CC0771490A15261B2DD908F53F10203010001
 
         static AsymmetricKeyParameter GetPublicKey(byte[] keyInfoData)
         {
@@ -126,7 +87,7 @@ namespace ICSharpCode.SharpZipLib.Zip
             return PublicKeyFactory.CreateKey(new SubjectPublicKeyInfo(algId ?? new AlgorithmIdentifier(PkcsObjectIdentifiers.RsaEncryption), keyData.GetBytes()));
         }
 
-        internal static bool DecryptKeysTable(byte[] aesKey, ref CryCustomEncryptionHeader headerEncryption, int digestSize, out byte[] cdrIV, out byte[][] keysTable)
+        public static bool DecryptKeysTable(byte[] aesKey, byte[] CDR_IV, byte[] keys_table, int digestSize, out byte[] cdrIV, out byte[][] keysTable)
         {
             var digest = digestSize == 257 ? new Blake2bDigest()
                 : digestSize == 256 ? (IDigest)new Sha256Digest()
@@ -135,15 +96,17 @@ namespace ICSharpCode.SharpZipLib.Zip
             {
                 var publicKey = GetPublicKey(aesKey ?? _RsaKey);
                 var cipher = new OaepEncoding(new RsaEngine(), digest);
+
+                // cdr iv
                 cipher.Init(false, publicKey);
-                cdrIV = cipher.ProcessBlock(headerEncryption.CDR_IV, 0, RSA_KEY_MESSAGE_LENGTH);
+                cdrIV = cipher.ProcessBlock(CDR_IV, 0, RSA_KEY_MESSAGE_LENGTH);
 
                 // Decrypt the table of cipher keys.
                 keysTable = new byte[BLOCK_CIPHER_NUM_KEYS][];
                 for (int i = 0, offset = 0; i < BLOCK_CIPHER_NUM_KEYS; i++, offset += RSA_KEY_MESSAGE_LENGTH)
                 {
                     cipher.Init(false, publicKey);
-                    keysTable[i] = cipher.ProcessBlock(headerEncryption.keys_table, offset, RSA_KEY_MESSAGE_LENGTH);
+                    keysTable[i] = cipher.ProcessBlock(keys_table, offset, RSA_KEY_MESSAGE_LENGTH);
                 }
                 return true;
             }

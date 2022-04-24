@@ -3,10 +3,11 @@
     /// <summary>
     /// ZipDirStructures
     /// </summary>
-    internal unsafe static class ZipDir
+    internal unsafe static partial class ZipDir
     {
         static readonly uint[] TEA_DEFAULTKEY = { 0xc968fb67, 0x8f9b4267, 0x85399e84, 0xf9b99dc4 };
         const uint TEA_DELTA = 0x9e3779b9;
+
         static void btea(uint* v, int n, uint[] k)
         {
             uint y, z, sum;
@@ -53,8 +54,7 @@
 
         static void SwapByteOrder(uint* values, int count)
         {
-            for (uint* w = values, e = values + count; w != e; ++w)
-                *w = (*w >> 24) + ((*w >> 8) & 0xff00) + ((*w & 0xff00) << 8) + (*w << 24);
+            for (uint* w = values, e = values + count; w != e; ++w) *w = (*w >> 24) + ((*w >> 8) & 0xff00) + ((*w & 0xff00) << 8) + (*w << 24);
         }
 
         internal static void TeaEncrypt(ref byte[] data, int size)
@@ -70,7 +70,7 @@
             }
         }
 
-        internal static void TeaDecrypt(ref byte[] data, int size, Cry3File.CryCustomTeaEncryptionHeader header)
+        internal static void XTeaDecrypt(ref byte[] data, int size)
         {
             fixed (byte* dataPtr = data)
             {
