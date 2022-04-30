@@ -38,7 +38,7 @@ namespace ICSharpCode.SharpZipLib.Zip
             {
                 n = -n;
                 rounds = (uint)(6 + 52 / n);
-                sum = rounds * 0x9e3779b9;
+                sum = rounds * TEA_DELTA;
                 y = v[0];
                 do
                 {
@@ -55,57 +55,12 @@ namespace ICSharpCode.SharpZipLib.Zip
             }
         }
 
-        static void bteaRev(uint* v, int n, uint[] k)
-        {
-            uint y, z, sum;
-            uint p, rounds, e;
-            uint MX() => ((z >> 5 ^ y << 2) + (y >> 3 ^ z << 4)) ^ ((sum ^ y) + (k[(p & 3) ^ e] ^ z));
-
-            if (n > 1) // Coding Part
-            {
-                rounds = (uint)(6 + 52 / n);
-                sum = 0;
-                z = v[n - 1];
-                do
-                {
-                    sum -= TEA_DELTA2;
-                    e = (sum >> 2) & 3;
-                    for (p = 0; p < (uint)(n - 1); p++)
-                    {
-                        y = v[p + 1];
-                        z = v[p] += MX();
-                    }
-                    y = v[0];
-                    z = v[n - 1] += MX();
-                } while (--rounds != 0);
-            }
-            else if (n < -1) // Decoding Part
-            {
-                n = -n;
-                rounds = (uint)(6 + 52 / n);
-                sum = rounds * 0x9e3779b9;
-                y = v[0];
-                do
-                {
-                    e = (sum >> 2) & 3;
-                    for (p = (uint)(n - 1); p > 0; p--)
-                    {
-                        z = v[p - 1];
-                        y = v[p] -= MX();
-                    }
-                    z = v[n - 1];
-                    y = v[0] -= MX();
-                    sum += TEA_DELTA2;
-                } while (--rounds != 0);
-            }
-        }
-
         static void SwapByteOrder(uint* values, int count)
         {
             for (uint* w = values, e = values + count; w != e; ++w) *w = (*w >> 24) | ((*w >> 8) & 0xff00) | ((*w & 0xff00) << 8) | (*w << 24);
         }
 
-        internal static void XXTeaEncrypt(ref byte[] data, int size, bool deltaRev)
+        internal static void XXTeaEncrypt(ref byte[] data, int size)
         {
             fixed (byte* dataPtr = data)
             {
@@ -113,13 +68,12 @@ namespace ICSharpCode.SharpZipLib.Zip
                 var encryptedLen = size >> 2;
 
                 SwapByteOrder(intBuffer, encryptedLen);
-                if (deltaRev) bteaRev(intBuffer, encryptedLen, TEA_DEFAULTKEY);
-                else btea(intBuffer, encryptedLen, TEA_DEFAULTKEY);
+                btea(intBuffer, encryptedLen, TEA_DEFAULTKEY);
                 SwapByteOrder(intBuffer, encryptedLen);
             }
         }
 
-        internal static void XXTeaDecrypt(ref byte[] data, int size, bool deltaRev)
+        internal static void XXTeaDecrypt(ref byte[] data, int size)
         {
             fixed (byte* dataPtr = data)
             {
@@ -127,8 +81,7 @@ namespace ICSharpCode.SharpZipLib.Zip
                 var encryptedLen = size >> 2;
 
                 SwapByteOrder(intBuffer, encryptedLen);
-                if (deltaRev) bteaRev(intBuffer, -encryptedLen, TEA_DEFAULTKEY);
-                else btea(intBuffer, -encryptedLen, TEA_DEFAULTKEY);
+                btea(intBuffer, -encryptedLen, TEA_DEFAULTKEY);
                 SwapByteOrder(intBuffer, encryptedLen);
             }
         }

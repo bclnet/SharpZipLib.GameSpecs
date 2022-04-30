@@ -362,6 +362,7 @@ namespace ICSharpCode.SharpZipLib.Zip
             }
             else
             {
+                var teaEncryption = _headerTeaEncryption.nHeaderSize != 0;
                 _baseStream.Seek(start, SeekOrigin.Begin);
                 var compressed = _baseStream.ReadBytes((int)entry.CompressedSize);
                 switch (method)
@@ -374,7 +375,8 @@ namespace ICSharpCode.SharpZipLib.Zip
                         }
                     case (CompressionMethod)METHOD_DEFLATE_AND_ENCRYPT:
                         {
-                            ZipDir.XXTeaDecrypt(ref compressed, (int)entry.CompressedSize, false);
+                            if (teaEncryption) goto case (CompressionMethod)METHOD_DEFLATE_AND_STREAMCIPHER_KEYTABLE;
+                            ZipDir.XXTeaDecrypt(ref compressed, (int)entry.CompressedSize);
                             method = CompressionMethod.Deflated;
                             break;
                         }
@@ -384,7 +386,7 @@ namespace ICSharpCode.SharpZipLib.Zip
                             var keyIndex = ZipEncrypt.GetEncryptionKeyIndex(entry);
                             ZipEncrypt.GetEncryptionInitialVector(entry, out var IV);
                             if (!ZipEncrypt.DecryptBufferWithStreamCipher('2', ref compressed, (int)entry.CompressedSize, CryCustomKeys[keyIndex], IV)) throw new ZipException("Data is corrupt");
-                            method = CompressionMethod.Deflated;
+                            method = (teaEncryption && method == (CompressionMethod)METHOD_DEFLATE_AND_STREAMCIPHER) ? CompressionMethod.Stored : CompressionMethod.Deflated;
                             break;
                         }
                     default:
@@ -392,7 +394,6 @@ namespace ICSharpCode.SharpZipLib.Zip
                         {
                             var keyIndex = ZipEncrypt.GetEncryptionKeyIndex(entry);
                             ZipEncrypt.GetEncryptionInitialVector(entry, out var IV);
-                            //var useTwoFish = _encryptedHeaders != EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE2;
                             if (!ZipEncrypt.DecryptBufferWithStreamCipher('A', ref compressed, (int)entry.CompressedSize, CryCustomKeys[keyIndex], IV)) throw new ZipException("Data is corrupt");
                         }
                         break;
@@ -825,6 +826,7 @@ namespace ICSharpCode.SharpZipLib.Zip
         CryCustomTeaEncryptionHeader _headerTeaEncryption;
         byte[] CryCustomIV;
         byte[][] CryCustomKeys;
+        static readonly byte[] DEFAULT_CUSTOMIV = { 0x70, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
         unsafe bool DecodeHeaderData(int nSize)
         {
@@ -833,12 +835,13 @@ namespace ICSharpCode.SharpZipLib.Zip
                 var bytes = _baseStream.ReadBytes(nSize);
                 switch (_encryptedHeaders)
                 {
-                    case EHeaderEncryptionType.HEADERS_ENCRYPTED_TEA: ZipDir.XXTeaDecrypt(ref bytes, nSize, _headerTeaEncryption.nHeaderSize != 0); break;
+                    case EHeaderEncryptionType.HEADERS_ENCRYPTED_TEA: ZipDir.XXTeaDecrypt(ref bytes, nSize); break;
                     case EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER: ZipDir.StreamCipher(ref bytes, nSize, GetReferenceCRCForPak()); break;
                     case EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE:
                     case EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE2:
                         var engineId = _encryptedHeaders == EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE2 ? 'A' : '2';
-                        if (!ZipEncrypt.DecryptBufferWithStreamCipher(engineId, ref bytes, nSize, CryCustomKeys[0], CryCustomIV)) { Console.WriteLine("Failed to decrypt pak header"); return false; }
+                        var iv = _headerTeaEncryption.nHeaderSize != 0 ? DEFAULT_CUSTOMIV : CryCustomIV;
+                        if (!ZipEncrypt.DecryptBufferWithStreamCipher(engineId, ref bytes, nSize, CryCustomKeys[0], iv)) { Console.WriteLine("Failed to decrypt pak header"); return false; }
                         break;
                     default: Console.WriteLine("Attempting to load encrypted pak by unsupported method"); return false;
                 }
@@ -1020,7 +1023,7 @@ namespace ICSharpCode.SharpZipLib.Zip
 
                 // Encryption technique has been specified in both the disk number (old technique) and the custom header (new technique).
                 if (_encryptedHeaders != EHeaderEncryptionType.HEADERS_ENCRYPTED_TEA &&
-                    _headerExtended.nEncryption != (ushort)EHeaderEncryptionType.HEADERS_NOT_ENCRYPTED && _encryptedHeaders != EHeaderEncryptionType.HEADERS_NOT_ENCRYPTED)
+                    _headerExtended.nEncryption != (ushort)EHeaderEncryptionType.HEADERS_NOT_ENCRYPTED && _encryptedHeaders != 0)
                     throw new ZipException("Unexpected encryption technique in header");
 
                 else
@@ -1071,9 +1074,9 @@ namespace ICSharpCode.SharpZipLib.Zip
                             Unknown1 = _stream.ReadBytes(172),
                         };
                         if (_headerTeaEncryption.nHeaderSize != CryCustomTeaEncryptionHeader.SizeOf + CryCustomEncryptionHeader.SizeOf) throw new ZipException("Bad encryption header");
+                        _encryptedHeaders = EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE;
                     }
-                    if (_encryptedHeaders == EHeaderEncryptionType.HEADERS_ENCRYPTED_TEA ||
-                        _encryptedHeaders == EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE ||
+                    if (_encryptedHeaders == EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE ||
                         _encryptedHeaders == EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE2)
                     {
                         var hasSize2 = _encryptedHeaders == EHeaderEncryptionType.HEADERS_ENCRYPTED_STREAMCIPHER_KEYTABLE2;
@@ -1087,7 +1090,7 @@ namespace ICSharpCode.SharpZipLib.Zip
                         };
                         if (_headerEncryption.nHeaderSize != 0 && _headerEncryption.nHeaderSize != CryCustomEncryptionHeader.SizeOf + (hasSize2 ? CryCustomEncryptionHeader.SizeOf2 : 0)) throw new ZipException("Bad encryption header");
                         // We have a table of symmetric keys to decrypt
-                        var digestSize = _encryptedHeaders == EHeaderEncryptionType.HEADERS_ENCRYPTED_TEA ? 1 : 256;
+                        var digestSize = _headerTeaEncryption.nHeaderSize != 0 ? 1 : 256;
                         ZipEncrypt.DecryptKeysTable(_aesKey, _headerEncryption.CDR_IV, _headerEncryption.Keys_Table, digestSize, out CryCustomIV, out CryCustomKeys);
                     }
                 }

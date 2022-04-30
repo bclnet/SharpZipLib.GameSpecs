@@ -11,8 +11,8 @@ using System.Text;
 
 // TEA, comments:TEA (ERROR)
 const string AesKey = "aes:308189028181009B606931DCF7027A4DC0E5263B4AD0D8F4A492A16E4B5EC0850F074B4C3DA627FF96676D2379F89062DE6C917F268CBD822404D26D9D79BCB0182D4C96EEAF2B918A0300BFB81619622D1556B4E02D16FE0C7ED72C01EE429C4C849C6A786BCEC44D6C50CB914648BB662D0BA235680002D4605058D1C30DA11237822A01F2EF0203010001";
-//const string PakPath = @"D:\Program Files (x86)\Steam\steamapps\common\Warface\13_2000076\Game\GameInfo.pak";
-const string PakPath = @"D:\Program Files (x86)\Steam\steamapps\common\Warface\13_2000076\Game\Textures_Other.pak";
+const string PakPath = @"D:\Program Files (x86)\Steam\steamapps\common\Warface\13_2000076\Game\GameInfo.pak";
+//const string PakPath = @"D:\Program Files (x86)\Steam\steamapps\common\Warface\13_2000076\Game\Textures_Other.pak";
 
 // comments:NEWHUNT|NEWHUNT (OK)
 //const string AesKey = "aes:30818902818100affd71ca741c1aa5895becf596e8732d290453d275cf6ff0bb214324ebab7eedd7f39deebc2708d88b6d536a58da5683137fafec478e41e6f8b0882e5eba236b9d2a150ee513ae562ce56b6aaf982c27a8c317281afa0f84f546ecb825ccf2217519c84ed0ceab179ee5ccdab0cb40a95d5442120f25a61e7da79d30c7d7d8a70203010001";
@@ -53,7 +53,7 @@ foreach (ZipEntry ent in pak)
         // create directory
         using var input = pak.GetInputStream(ent);
         if (ent.Size == 0) continue;
-        var newPath = Path.Combine(@"D:\T_\GameSpec\Wolcen\", ent.Name);
+        var newPath = Path.Combine(@"D:\T_\GameSpec\Warface\", ent.Name);
         var directory = Path.GetDirectoryName(newPath);
         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory)) Directory.CreateDirectory(directory);
         using var s = new FileStream(newPath, FileMode.Create, FileAccess.Write);
