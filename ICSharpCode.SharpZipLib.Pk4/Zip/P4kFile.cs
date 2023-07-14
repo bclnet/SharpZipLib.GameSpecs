@@ -16,7 +16,7 @@ namespace ICSharpCode.SharpZipLib.Zip
     /// <seealso cref="ICSharpCode.SharpZipLib.Zip.ZipFile" />
     public class P4kFile : ZipFile
     {
-        static readonly StringCodec CompatCodec = new StringCodec();
+        static readonly StringCodec CompatCodec = StringCodec.Default;
         //StringCodec _stringCodecLocal = CompatCodec;
         internal Stream _baseStream;
         ZipEntry[] _entries;

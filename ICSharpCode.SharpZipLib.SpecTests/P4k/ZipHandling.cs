@@ -9,8 +9,8 @@ namespace ICSharpCode.SharpZipLib.Tests.P4k
     {
         [Test]
         [Category("P4k")]
-        //[TestCase(@"D:\Roberts Space Industries\StarCitizen\LIVE\Data.p4k", "aes:5E7A2002302EEB1A3BB617C30FDE1E47", @"Data\dedicated.cfg")]
-        [TestCase(@"D:\Roberts Space Industries\StarCitizen\LIVE\Data.p4k", "aes:5E7A2002302EEB1A3BB617C30FDE1E47", @"Data\Scripts\Entities\Vehicles\Implementations\Xml\DRAK_Cutlass.xml")]
+        [TestCase(@"D:\Roberts Space Industries\StarCitizen\LIVE\Data.p4k", "aes:5E7A2002302EEB1A3BB617C30FDE1E47", @"Data\dedicated.cfg")]
+        //[TestCase(@"D:\Roberts Space Industries\StarCitizen\LIVE\Data.p4k", "aes:5E7A2002302EEB1A3BB617C30FDE1E47", @"Data\Scripts\Entities\Vehicles\Implementations\Xml\DRAK_Cutlass.xml")]
         public void OpenFile(string path, string aesKey, string entryPath)
         {
             using var pakStream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -26,8 +26,8 @@ namespace ICSharpCode.SharpZipLib.Tests.P4k
 
         [Test]
         [Category("P4k")]
-        //[TestCase(@"D:\Roberts Space Industries\StarCitizen\LIVE\Data.p4k", "aes:5E7A2002302EEB1A3BB617C30FDE1E47", @"Data\dedicated.cfg")]
-        [TestCase(@"D:\Roberts Space Industries\StarCitizen\LIVE\Data.p4k", "aes:5E7A2002302EEB1A3BB617C30FDE1E47", @"Data\Scripts\Entities\Vehicles\Implementations\Xml\DRAK_Cutlass.xml")]
+        [TestCase(@"D:\Roberts Space Industries\StarCitizen\LIVE\Data.p4k", "aes:5E7A2002302EEB1A3BB617C30FDE1E47", @"Data\dedicated.cfg")]
+        //[TestCase(@"D:\Roberts Space Industries\StarCitizen\LIVE\Data.p4k", "aes:5E7A2002302EEB1A3BB617C30FDE1E47", @"Data\Scripts\Entities\Vehicles\Implementations\Xml\DRAK_Cutlass.xml")]
         public void OpenFileEntry(string path, string aesKey, string entryPath)
         {
             using var pakStream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read);

@@ -20,7 +20,7 @@ namespace ICSharpCode.SharpZipLib.Zip
     /// <seealso cref="ICSharpCode.SharpZipLib.Zip.ZipFile" />
     public class Cry3File : ZipFile
     {
-        static readonly StringCodec CompatCodec = new StringCodec();
+        static readonly StringCodec CompatCodec = StringCodec.Default;
         //StringCodec _stringCodecLocal = CompatCodec;
         Stream _baseStream;
         ZipEntry[] _entries;
